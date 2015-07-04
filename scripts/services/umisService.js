@@ -1,19 +1,19 @@
 'use strict';
 
 angular.module('urbinsight.services')
-  .factory('UMISFactory', function ($http, $window) {
-    function countProperties(obj) {
+  .factory('UMISFactory', function () {
+    var countProperties = function(obj) {
       var count = 0;
 
       for(var prop in obj) {
-        if(obj.hasOwnProperty(prop))
+        if(obj.hasOwnProperty(prop)){
           ++count;
+        }
       }
-
       return count;
     };
 
-    function customForEach(collection, callback){
+    var customForEach = function (collection, callback){
 
       if(Array.isArray(collection)){
         for(var i = 0; i < collection.length; i++){
@@ -25,7 +25,7 @@ angular.module('urbinsight.services')
           callback(collection[item], item, collection);
         }
       }
-    }
+    };
 
     var UMIS = {};
     UMIS.DEFAULTS = {};
@@ -49,7 +49,7 @@ angular.module('urbinsight.services')
                         .landscape
                         .potsPools;
       return ( obj.litersPerLocation + obj.numPlantsPools ) / 7;
-    }
+    };
 
     UMIS.Water.totalConsumption.landscape.totalIrrigation = function(workbook){
       var obj = workbook.estimateDemand
@@ -57,14 +57,14 @@ angular.module('urbinsight.services')
                         .landscape
                         .irrigation;
       return ( obj.hoursPerWeek * obj.avgFlowRate ) * 60 / 7;
-    }
+    };
     UMIS.Water.runOffLitersPerDay = function(workbook){
       return UMIS.Water.unmediatedRainfall(workbook) * 
               UMIS.Water.totalAveragePermeability;
     };
 
     UMIS.Water.infiltrationPerDay = function(workbook){
-      UMIS.Water.unmediatedRainfall(workbook) *
+      return UMIS.Water.unmediatedRainfall(workbook) *
         (1 - UMIS.Water.totalAveragePermeability);
     };
 
@@ -83,7 +83,7 @@ angular.module('urbinsight.services')
     UMIS.Water.totalConsumption.waterCustomers = function(workbook){
       var obj = workbook.estimateDemand
                         .demandJunctions
-                        .waterCustomers
+                        .waterCustomers;
       return ( obj.excessCapacityPerDay * obj.percentageOfExcessDistributed ) * 1000; 
     };
 
@@ -126,12 +126,12 @@ angular.module('urbinsight.services')
     UMIS.Water.totalConsumption.hygiene = function(workbook){
       var obj = workbook.estimateDemand
                         .demandJunctions
-                        .hygiene
+                        .hygiene;
       return  ( UMIS.Water.totalConsumption.hygiene.avgShowerConsumption(workbook) * obj.typicalShowerDuration *
                 obj.weeklyShowersPerPerson )+
               ( obj.bathVolume * obj.bathsPerWeek ) / 7 + 
               ( obj.minutesOfTapFlowPerVisit * obj.ablutionDuration * 
-                obj.numOccupantsUsingWashrooms * obj.numVisitsToWashroomPerOccupant )
+                obj.numOccupantsUsingWashrooms * obj.numVisitsToWashroomPerOccupant );
               
     };
 
@@ -153,38 +153,37 @@ angular.module('urbinsight.services')
     UMIS.Water.averagePermeability = function(workbook, surfaceType){
       return  workbook.estimateDemand
                      .landCoverPreCalculation
-                     .surfaceTypes.surfaceType
+                     .surfaceTypes[surfaceType]
                      .effectivePermeability *
               workbook.estimateDemand
                       .landCoverPreCalculation
-                      .surfaceTypes
-                      .surfaceType
+                      .surfaceTypes[surfaceType]
                       .portionParcel;
-    }
+    };
 
     UMIS.Water.totalAveragePermeability = function(workbook){
       var total = 0;
       workbook.estimateDemand
               .landCoverPreCalculation
               .surfaceTypes
-              .forEach(function(surfaceType, value){
-        total += UMIS.Water.averagePermeability(workbook, surfaceType)
+              .forEach(function(surfaceType){
+        total += UMIS.Water.averagePermeability(workbook, surfaceType);
       });
       return total;
-    }
+    };
     UMIS.Water.totalToilets = function(workbook){
       var obj = workbook.estimateDemand
                         .demandJunctions
                         .toilets
-                        .activeToilets
+                        .activeToilets;
       return countProperties(obj);
-    }
+    };
 
     //might need to write a for each.
 
     UMIS.Water.averageFlush = function(workbook){
       var totalToilets = this.totalToilets(workbook);
-      var totalFlushVolume = 0
+      var totalFlushVolume = 0;
       var toilets = workbook.estimateDemand
                             .demandJunctions
                             .toilets
@@ -193,47 +192,46 @@ angular.module('urbinsight.services')
                 totalFlushVolume += obj.flushVolume;
               });
       return totalFlushVolume / totalToilets;
-    }
+    };
 
     UMIS.Water.totalConsumption.toilets = function(workbook, parcel){
       return UMIS.Water.averageFlush(workbook) * UMIS.Calculations.totalEffectiveOccupancy(parcel) *
-        workbook.estimateDemand.demandJunctions.toilets.dailyPerPersonUsage
-    }
+        workbook.estimateDemand.demandJunctions.toilets.dailyPerPersonUsage;
+    };
     UMIS.Calculations.effectiveOccupancyByAge = function(parcel, ageType){
-      var total = 0
+      var total = 0;
       customForEach(parcel.describeParcel.demographics[ageType], function(value, key){
         if(key === 'livingWorking'){
           total += value;
         }
         else {
-          total += (value * .5);
+          total += (value * 0.5);
         }
       });
       return total;
-    }
+    };
 
     UMIS.Calculations.totalEffectiveOccupancy = function(parcel){
-      var total = 0
+      var total = 0;
       var ageTypes = ['seniors', 'adults', 'youth'];
       ageTypes.forEach(function(ageType){
         total += UMIS.Calculations.effectiveOccupancyByAge(parcel, ageType);
-      })
+      });
       return total;
-    }
+    };
     return {
       totalConsumption: function(workbook, parcel){
-        var that = this;
         var result = {};
-        result['Toilets'] = UMIS.Water.totalConsumption.toilets(workbook, parcel);
-        result['Hygiene'] = UMIS.Water.totalConsumption.hygiene(workbook);
-        result['Kitchen'] = UMIS.Water.totalConsumption.kitchen(workbook);
-        result['Laundry'] = UMIS.Water.totalConsumption.laundry(workbook);
-        result['Drinking'] = UMIS.Water.totalConsumption.drinking(workbook);
+        result.Toilets = UMIS.Water.totalConsumption.toilets(workbook, parcel);
+        result.Hygiene = UMIS.Water.totalConsumption.hygiene(workbook);
+        result.Kitchen = UMIS.Water.totalConsumption.kitchen(workbook);
+        result.Laundry = UMIS.Water.totalConsumption.laundry(workbook);
+        result.Drinking = UMIS.Water.totalConsumption.drinking(workbook);
         // result['Landscape'] = UMIS.Water.totalConsumption.landscape(workbook, parcel);
         result['Surface Cleaning'] = UMIS.Water.totalConsumption.surfaceCleaning(workbook);
         result['Evaporative Cooling'] = UMIS.Water.totalConsumption.evaporativeCooling(workbook);
         result['Water Customers'] = UMIS.Water.totalConsumption.waterCustomers(workbook);
         return result;
       }
-    }
-  })
+    };
+  });
